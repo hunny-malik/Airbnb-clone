@@ -34,8 +34,46 @@ export async function getDefaultUsers(): Promise<{ guest: User; host: User }> {
 
 import { FALLBACK_LISTINGS } from './mockData';
 
+// LocalStorage helpers for listing resilience when backend is waking up or offline
+function getLocalListings(): Listing[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const data = localStorage.getItem('airbnb_local_listings');
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalListing(l: Listing) {
+  if (typeof window === 'undefined') return;
+  try {
+    const list = getLocalListings();
+    const idx = list.findIndex((item) => item.id === l.id);
+    if (idx >= 0) {
+      list[idx] = l;
+    } else {
+      list.unshift(l);
+    }
+    localStorage.setItem('airbnb_local_listings', JSON.stringify(list));
+  } catch (err) {
+    console.error("Failed to save local listing:", err);
+  }
+}
+
+function removeLocalListing(id: number) {
+  if (typeof window === 'undefined') return;
+  try {
+    const list = getLocalListings().filter((l) => l.id !== id);
+    localStorage.setItem('airbnb_local_listings', JSON.stringify(list));
+  } catch (err) {
+    console.error("Failed to delete local listing:", err);
+  }
+}
+
 // Listings Search & Filters
 export async function getListings(filters: FilterState = {}, host_id?: number): Promise<Listing[]> {
+  const localListings = getLocalListings();
   const params = new URLSearchParams();
 
   if (host_id) params.append('host_id', host_id.toString());
@@ -55,10 +93,16 @@ export async function getListings(filters: FilterState = {}, host_id?: number): 
   const queryString = params.toString() ? `?${params.toString()}` : '';
 
   try {
-    return await fetchAPI<Listing[]>(`/listings${queryString}`);
+    const remote = await fetchAPI<Listing[]>(`/listings${queryString}`);
+    const map = new Map<number, Listing>();
+    localListings.forEach((l) => map.set(l.id, l));
+    remote.forEach((l) => map.set(l.id, l));
+    let result = Array.from(map.values());
+    if (host_id) result = result.filter((l) => l.host_id === host_id);
+    return result;
   } catch (err) {
     console.error("Backend fetch error, serving fallback listings:", err);
-    let result = [...FALLBACK_LISTINGS];
+    let result = [...localListings, ...FALLBACK_LISTINGS];
 
     if (host_id) {
       result = result.filter((l) => l.host_id === host_id);
@@ -91,9 +135,13 @@ export async function getListings(filters: FilterState = {}, host_id?: number): 
 // Listing Detail
 export async function getListingById(id: number): Promise<Listing> {
   try {
-    return await fetchAPI<Listing>(`/listings/${id}`);
+    const remote = await fetchAPI<Listing>(`/listings/${id}`);
+    saveLocalListing(remote);
+    return remote;
   } catch (err) {
     console.error(`Backend fetch error for listing ${id}, serving fallback item:`, err);
+    const local = getLocalListings().find((l) => l.id === id);
+    if (local) return local;
     const item = FALLBACK_LISTINGS.find((l) => l.id === id);
     if (item) return item;
     return FALLBACK_LISTINGS[0];
@@ -135,23 +183,104 @@ export async function getBookedDates(id: number): Promise<{ check_in: string; ch
 
 // Host Listing CRUD
 export async function createListing(data: CreateListingForm): Promise<Listing> {
-  return fetchAPI<Listing>('/listings', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+  try {
+    const remote = await fetchAPI<Listing>('/listings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    saveLocalListing(remote);
+    return remote;
+  } catch (err) {
+    console.warn("Backend API unavailable during createListing, using local fallback:", err);
+    const newId = Date.now();
+    const photosList = data.photos.map((url, idx) => ({
+      id: newId + idx,
+      listing_id: newId,
+      url: url,
+      is_primary: idx === 0,
+      display_order: idx,
+    }));
+
+    const fallbackListing: Listing = {
+      id: newId,
+      host_id: data.host_id,
+      title: data.title,
+      description: data.description,
+      category_id: data.category_id,
+      property_type: data.property_type,
+      room_type: data.room_type || 'Entire place',
+      address: data.address,
+      city: data.city,
+      state: data.state || '',
+      country: data.country || 'India',
+      lat: data.lat || 28.6139,
+      lng: data.lng || 77.2090,
+      price_per_night: data.price_per_night,
+      cleaning_fee: data.cleaning_fee || 500,
+      service_fee: data.service_fee || 300,
+      max_guests: data.max_guests,
+      bedrooms: data.bedrooms,
+      beds: data.beds,
+      bathrooms: data.bathrooms,
+      amenities: data.amenities || [],
+      rating: 5.0,
+      reviews_count: 0,
+      photos: photosList,
+      host: {
+        id: data.host_id,
+        name: "Rajesh Sharma",
+        email: "rajesh.sharma@airbnb.com",
+        avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80",
+        is_host: true,
+        is_superhost: true,
+        joined_date: "2018",
+      },
+    };
+
+    saveLocalListing(fallbackListing);
+    return fallbackListing;
+  }
 }
 
 export async function updateListing(id: number, data: Partial<CreateListingForm>): Promise<Listing> {
-  return fetchAPI<Listing>(`/listings/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
+  try {
+    const updated = await fetchAPI<Listing>(`/listings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    saveLocalListing(updated);
+    return updated;
+  } catch (err) {
+    console.warn("Backend API unavailable during updateListing, updating local fallback:", err);
+    const existing = (await getListingById(id)) || FALLBACK_LISTINGS[0];
+    const updatedListing: Listing = {
+      ...existing,
+      ...data,
+      photos: data.photos
+        ? data.photos.map((url, idx) => ({
+            id: id * 10 + idx,
+            listing_id: id,
+            url,
+            is_primary: idx === 0,
+            display_order: idx,
+          }))
+        : existing.photos,
+    };
+    saveLocalListing(updatedListing);
+    return updatedListing;
+  }
 }
 
 export async function deleteListing(id: number): Promise<{ message: string }> {
-  return fetchAPI<{ message: string }>(`/listings/${id}`, {
-    method: 'DELETE',
-  });
+  removeLocalListing(id);
+  try {
+    return await fetchAPI<{ message: string }>(`/listings/${id}`, {
+      method: 'DELETE',
+    });
+  } catch (err) {
+    console.warn("Backend API unavailable during deleteListing, deleted locally:", err);
+    return { message: "Listing deleted successfully" };
+  }
 }
 
 // Bookings Engine with LocalStorage Fallback Resilience

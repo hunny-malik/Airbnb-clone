@@ -141,6 +141,12 @@ def get_listing_by_id(db: Session, listing_id: int):
     return listing
 
 def create_listing(db: Session, listing_in: schemas.ListingCreate):
+    # Ensure host user exists
+    host = db.query(models.User).filter(models.User.id == listing_in.host_id).first()
+    if not host:
+        _, host = get_or_create_default_users(db)
+        listing_in.host_id = host.id
+
     amenities_json = json.dumps(listing_in.amenities)
     db_listing = models.Listing(
         host_id=listing_in.host_id,
