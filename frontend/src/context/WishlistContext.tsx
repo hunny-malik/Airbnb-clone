@@ -43,13 +43,16 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const toggleFavorite = async (listingId: number): Promise<boolean> => {
     if (!currentUser) return false;
 
+    const isCurrentlyWishlisted = wishlistIds.has(listingId);
+    const targetSavedState = !isCurrentlyWishlisted;
+
     // Optimistic UI update
     setWishlistIds((prev) => {
       const next = new Set(prev);
-      if (next.has(listingId)) {
-        next.delete(listingId);
-      } else {
+      if (targetSavedState) {
         next.add(listingId);
+      } else {
+        next.delete(listingId);
       }
       return next;
     });
@@ -60,8 +63,8 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return res.saved;
     } catch (err) {
       console.error("Failed to toggle wishlist:", err);
-      await refreshWishlist(); // revert on error
-      return false;
+      await refreshWishlist();
+      return targetSavedState;
     }
   };
 

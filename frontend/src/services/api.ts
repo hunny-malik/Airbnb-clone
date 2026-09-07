@@ -423,14 +423,86 @@ export async function addReview(data: {
   });
 }
 
-// Wishlists
+// LocalStorage helpers for Wishlists
+function getLocalWishlists(userId: number): WishlistItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const data = localStorage.getItem(`airbnb_local_wishlist_${userId}`);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalWishlist(userId: number, items: WishlistItem[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(`airbnb_local_wishlist_${userId}`, JSON.stringify(items));
+  } catch (err) {
+    console.error("Failed to save local wishlist:", err);
+  }
+}
+
 export async function toggleWishlist(userId: number, listingId: number): Promise<{ saved: boolean; listing_id: number }> {
-  return fetchAPI<{ saved: boolean; listing_id: number }>('/wishlists/toggle', {
-    method: 'POST',
-    body: JSON.stringify({ user_id: userId, listing_id: listingId }),
-  });
+  try {
+    const remote = await fetchAPI<{ saved: boolean; listing_id: number }>('/wishlists/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, listing_id: listingId }),
+    });
+
+    const local = getLocalWishlists(userId);
+    if (remote.saved) {
+      const listing = (await getListingById(listingId)) || FALLBACK_LISTINGS[0];
+      if (!local.some((w) => w.listing_id === listingId)) {
+        local.push({
+          id: Date.now(),
+          user_id: userId,
+          listing_id: listingId,
+          listing,
+        });
+      }
+    } else {
+      const filtered = local.filter((w) => w.listing_id !== listingId);
+      saveLocalWishlist(userId, filtered);
+      return remote;
+    }
+    saveLocalWishlist(userId, local);
+    return remote;
+  } catch (err) {
+    console.warn("Backend API unavailable during toggleWishlist, using local fallback:", err);
+    const local = getLocalWishlists(userId);
+    const existingIndex = local.findIndex((w) => w.listing_id === listingId);
+    let saved = false;
+
+    if (existingIndex >= 0) {
+      local.splice(existingIndex, 1);
+      saved = false;
+    } else {
+      const listing = (await getListingById(listingId)) || FALLBACK_LISTINGS.find((l) => l.id === listingId) || FALLBACK_LISTINGS[0];
+      local.push({
+        id: Date.now(),
+        user_id: userId,
+        listing_id: listingId,
+        listing,
+      });
+      saved = true;
+    }
+
+    saveLocalWishlist(userId, local);
+    return { saved, listing_id: listingId };
+  }
 }
 
 export async function getUserWishlists(userId: number): Promise<WishlistItem[]> {
-  return fetchAPI<WishlistItem[]>(`/wishlists/user/${userId}`);
+  const localWishlists = getLocalWishlists(userId);
+  try {
+    const remote = await fetchAPI<WishlistItem[]>(`/wishlists/user/${userId}`);
+    const map = new Map<number, WishlistItem>();
+    localWishlists.forEach((item) => map.set(item.listing_id, item));
+    remote.forEach((item) => map.set(item.listing_id, item));
+    return Array.from(map.values());
+  } catch (err) {
+    console.warn("Backend API unavailable for wishlist, serving local wishlist:", err);
+    return localWishlists;
+  }
 }
