@@ -59,7 +59,19 @@ export default function CategoriesBar({
         const data = await getCategories();
         setCategories(data);
       } catch (err) {
-        console.error("Failed to load categories:", err);
+        console.error("Failed to load categories, using fallback options:", err);
+        setCategories([
+          { id: "beachfront", name: "Beachfront", icon: "Waves" },
+          { id: "cabins", name: "Cabins", icon: "TreePine" },
+          { id: "mansions", name: "Mansions", icon: "Building2" },
+          { id: "iconic_cities", name: "Iconic Cities", icon: "Building" },
+          { id: "countryside", name: "Countryside", icon: "Mountain" },
+          { id: "lakefront", name: "Lakefront", icon: "Compass" },
+          { id: "pools", name: "Amazing Pools", icon: "Sparkles" },
+          { id: "tiny_homes", name: "Tiny Homes", icon: "Home" },
+          { id: "treehouses", name: "Treehouses", icon: "Trees" },
+          { id: "tropical", name: "Tropical", icon: "Sun" },
+        ]);
       }
     }
     loadCats();

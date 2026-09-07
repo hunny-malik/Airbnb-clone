@@ -28,7 +28,27 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setGuestUser(guest);
         setHostUser(host);
       } catch (err) {
-        console.error("Failed to load users:", err);
+        console.error("Failed to load users from backend API, using fallback profile:", err);
+        setGuestUser({
+          id: 4,
+          name: "Aarav Verma",
+          email: "guest@airbnb.com",
+          avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80",
+          bio: "Tech professional based in Gurugram exploring stays across India.",
+          is_host: false,
+          is_superhost: false,
+          joined_date: "2022"
+        });
+        setHostUser({
+          id: 1,
+          name: "Rajesh Sharma",
+          email: "rajesh.sharma@airbnb.com",
+          avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80",
+          bio: "Superhost running premier heritage stays and luxury penthouses.",
+          is_host: true,
+          is_superhost: true,
+          joined_date: "2018"
+        });
       } finally {
         setIsLoading(false);
       }
