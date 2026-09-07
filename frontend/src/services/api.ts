@@ -217,25 +217,32 @@ export async function createBooking(data: {
 }
 
 export async function getUserTrips(userId: number): Promise<Booking[]> {
+  const localUserBookings = getLocalBookings().filter((b) => b.guest_id === userId);
   try {
     const remote = await fetchAPI<Booking[]>(`/bookings/user/${userId}`);
-    const local = getLocalBookings();
     const map = new Map<number, Booking>();
-    local.forEach((b) => map.set(b.id, b));
+    localUserBookings.forEach((b) => map.set(b.id, b));
     remote.forEach((b) => map.set(b.id, b));
     return Array.from(map.values());
   } catch (err) {
     console.warn("Backend API unavailable, serving local trips:", err);
-    return getLocalBookings();
+    return localUserBookings;
   }
 }
 
 export async function getHostReservations(hostId: number): Promise<Booking[]> {
+  const localHostBookings = getLocalBookings().filter(
+    (b) => b.listing?.host_id === hostId || b.listing?.host?.id === hostId
+  );
   try {
-    return await fetchAPI<Booking[]>(`/bookings/host/${hostId}`);
+    const remote = await fetchAPI<Booking[]>(`/bookings/host/${hostId}`);
+    const map = new Map<number, Booking>();
+    localHostBookings.forEach((b) => map.set(b.id, b));
+    remote.forEach((b) => map.set(b.id, b));
+    return Array.from(map.values());
   } catch (err) {
     console.warn("Backend API unavailable for host reservations:", err);
-    return getLocalBookings();
+    return localHostBookings;
   }
 }
 
