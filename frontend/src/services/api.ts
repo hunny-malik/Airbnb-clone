@@ -6,9 +6,6 @@ function getApiBaseUrl(): string {
   if (process.env.API_URL) return process.env.API_URL;
   if (process.env.API_BASE_URL) return process.env.API_BASE_URL;
   
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    return 'https://airbnb-clone-backend.onrender.com/api';
-  }
   return 'http://localhost:8000/api';
 }
 
