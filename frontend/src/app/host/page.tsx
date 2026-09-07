@@ -7,7 +7,7 @@ import { Listing, Booking } from '@/types';
 import { getListings, getHostReservations, deleteListing } from '@/services/api';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/context/ToastContext';
-import { PlusCircle, Home, DollarSign, Calendar, Trash2, Edit3, Eye, Sparkles, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, Home, DollarSign, Calendar, Trash2, Edit3, Eye, Sparkles, CheckCircle2, RefreshCw } from 'lucide-react';
 
 export default function HostDashboardPage() {
   const { hostUser, currentUser, isHostMode, toggleHostMode } = useUser();
@@ -35,6 +35,11 @@ export default function HostDashboardPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleManualSync = async () => {
+    await loadHostData();
+    showToast("Host listings & reservations synced with backend!", "success");
   };
 
   useEffect(() => {
@@ -101,13 +106,22 @@ export default function HostDashboardPage() {
             <p className="text-sm text-neutral-500 mt-1">Manage your properties, pricing, and incoming guest reservations.</p>
           </div>
 
-          <Link
-            href="/host/create"
-            className="inline-flex items-center gap-2 bg-[#FF385C] hover:bg-[#E00B41] text-white font-bold px-6 py-3.5 rounded-2xl text-sm transition-transform active:scale-95 shadow-md self-start sm:self-auto"
-          >
-            <PlusCircle className="w-5 h-5" />
-            <span>Create New Listing</span>
-          </Link>
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            <button
+              onClick={handleManualSync}
+              className="inline-flex items-center gap-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-800 font-bold px-4 py-3.5 rounded-2xl text-xs sm:text-sm transition-transform active:scale-95 shadow-xs cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Sync Listings</span>
+            </button>
+            <Link
+              href="/host/create"
+              className="inline-flex items-center gap-2 bg-[#FF385C] hover:bg-[#E00B41] text-white font-bold px-5 sm:px-6 py-3.5 rounded-2xl text-xs sm:text-sm transition-transform active:scale-95 shadow-md"
+            >
+              <PlusCircle className="w-5 h-5" />
+              <span>Create New Listing</span>
+            </Link>
+          </div>
         </div>
 
         {/* Metrics Cards Grid */}
