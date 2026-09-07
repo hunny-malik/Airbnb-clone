@@ -61,6 +61,7 @@ export default function CheckoutModal({
         children: 0,
         infants: 0,
         pets: 0,
+        listing,
       });
 
       // Fire festive celebration confetti!

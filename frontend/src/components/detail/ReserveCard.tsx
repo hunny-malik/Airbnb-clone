@@ -11,8 +11,22 @@ interface ReserveCardProps {
 }
 
 export default function ReserveCard({ listing }: ReserveCardProps) {
-  const [checkIn, setCheckIn] = useState<string>('2026-10-15');
-  const [checkOut, setCheckOut] = useState<string>('2026-10-20');
+  // Generate dynamic default dates (Check-in 7 days out, Checkout 12 days out)
+  const getInitialDates = () => {
+    const today = new Date();
+    const checkInDate = new Date(today);
+    checkInDate.setDate(today.getDate() + 7);
+    const checkOutDate = new Date(today);
+    checkOutDate.setDate(today.getDate() + 12);
+    return {
+      in: checkInDate.toISOString().split('T')[0],
+      out: checkOutDate.toISOString().split('T')[0],
+    };
+  };
+
+  const initialDates = getInitialDates();
+  const [checkIn, setCheckIn] = useState<string>(initialDates.in);
+  const [checkOut, setCheckOut] = useState<string>(initialDates.out);
   const [guestsCount, setGuestsCount] = useState<number>(2);
   const [isGuestOpen, setIsGuestOpen] = useState<boolean>(false);
   const [bookedRanges, setBookedRanges] = useState<{ check_in: string; check_out: string }[]>([]);
