@@ -19,6 +19,7 @@ export interface Category {
 
 export interface ListingPhoto {
   id: number;
+  listing_id?: number;
   url: string;
   is_primary: boolean;
   display_order: number;
@@ -47,10 +48,10 @@ export interface Listing {
   bathrooms: number;
   rating: number;
   reviews_count: number;
-  created_at: string;
-  host: User;
+  created_at?: string;
+  host?: User;
   photos: ListingPhoto[];
-  category: Category;
+  category?: Category;
   amenities: string[];
 }
 

@@ -32,6 +32,8 @@ export async function getDefaultUsers(): Promise<{ guest: User; host: User }> {
   return fetchAPI<{ guest: User; host: User }>('/users/default');
 }
 
+import { FALLBACK_LISTINGS } from './mockData';
+
 // Listings Search & Filters
 export async function getListings(filters: FilterState = {}, host_id?: number): Promise<Listing[]> {
   const params = new URLSearchParams();
@@ -51,12 +53,51 @@ export async function getListings(filters: FilterState = {}, host_id?: number): 
   if (filters.check_out) params.append('check_out', filters.check_out);
 
   const queryString = params.toString() ? `?${params.toString()}` : '';
-  return fetchAPI<Listing[]>(`/listings${queryString}`);
+
+  try {
+    return await fetchAPI<Listing[]>(`/listings${queryString}`);
+  } catch (err) {
+    console.error("Backend fetch error, serving fallback listings:", err);
+    let result = [...FALLBACK_LISTINGS];
+
+    if (host_id) {
+      result = result.filter((l) => l.host_id === host_id);
+    }
+    if (filters.category_id && filters.category_id !== 'all') {
+      result = result.filter((l) => l.category_id === filters.category_id);
+    }
+    if (filters.city) {
+      const q = filters.city.toLowerCase();
+      result = result.filter((l) => 
+        l.city.toLowerCase().includes(q) || 
+        l.country.toLowerCase().includes(q) || 
+        l.title.toLowerCase().includes(q)
+      );
+    }
+    if (filters.guests && filters.guests > 0) {
+      result = result.filter((l) => l.max_guests >= (filters.guests || 1));
+    }
+    if (filters.min_price !== undefined) {
+      result = result.filter((l) => l.price_per_night >= filters.min_price!);
+    }
+    if (filters.max_price !== undefined) {
+      result = result.filter((l) => l.price_per_night <= filters.max_price!);
+    }
+
+    return result;
+  }
 }
 
 // Listing Detail
 export async function getListingById(id: number): Promise<Listing> {
-  return fetchAPI<Listing>(`/listings/${id}`);
+  try {
+    return await fetchAPI<Listing>(`/listings/${id}`);
+  } catch (err) {
+    console.error(`Backend fetch error for listing ${id}, serving fallback item:`, err);
+    const item = FALLBACK_LISTINGS.find((l) => l.id === id);
+    if (item) return item;
+    return FALLBACK_LISTINGS[0];
+  }
 }
 
 // Booked Dates for Calendar
