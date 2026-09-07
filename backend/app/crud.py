@@ -427,7 +427,9 @@ def toggle_wishlist(db: Session, user_id: int, listing_id: int):
 
 def get_user_wishlists(db: Session, user_id: int):
     items = db.query(models.Wishlist).filter(models.Wishlist.user_id == user_id).all()
+    valid_items = []
     for item in items:
         if item.listing:
             item.listing.amenities = json.loads(item.listing.amenity_ids) if item.listing.amenity_ids else []
-    return items
+            valid_items.append(item)
+    return valid_items
